@@ -16,6 +16,33 @@ public class Item
     public int Amount;
 }
 
+public class PluklistFile
+{
+    public string FileName;
+    public int FileIndex;
+    public int NumberOfFiles;
+    public List<string> DataList;
+    public string FilePath;
+
+    public bool HasPrevious()
+    {
+        if(FileIndex > 0)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    public bool HasNext()
+    {
+        if(FileIndex < NumberOfFiles - 1)
+        {
+            return true;
+        }
+        return false;
+    }
+}
+
 public enum ItemType
 {
     Fysisk, Print
