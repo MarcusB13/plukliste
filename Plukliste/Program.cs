@@ -18,12 +18,13 @@ class PluklisteProgram {
     private static char readKey = ' ';
 
     private static BuisnessLayer buisnessLayer = new BuisnessLayer("export", "import");
-    private static string ConnString = "Data Source=10.130.54.66;Database=Pluklist;User ID=pluklist;Password=1234; TrustServerCertificate=True;";
+    private static string ConnString = "Data Source=10.130.54.120;Database=Plukliste;User ID=Plukliste;Password=1234; TrustServerCertificate=True;";
 
     static void Main()
     {
         using (var conn = new SqlConnection(ConnString))
         {
+            Console.WriteLine(ConnString);
             conn.Open();
             List<Pluklist> result = conn.Query<Pluklist>("SELECT * FROM pluklist").ToList();
 
@@ -34,8 +35,8 @@ class PluklisteProgram {
         }
 
 
-            //Arrange
-            Directory.CreateDirectory("import");
+        //Arrange
+        Directory.CreateDirectory("import");
         Directory.CreateDirectory("print");
         if (!DirectoryExists("export"))
         {
@@ -60,7 +61,7 @@ class PluklisteProgram {
             else
             {
                 buisnessLayer.getCurrentPlukListFile();
-
+                Console.WriteLine(String.Format("{0}/{1}", buisnessLayer.currentIndex + 1, buisnessLayer.fileCount));
                 Console.WriteLine(buisnessLayer.currentFile.pluklist.getNameAsString());
                 Console.WriteLine(buisnessLayer.currentFile.pluklist.getForsendelse());
                 Console.WriteLine(buisnessLayer.currentFile.pluklist.getLinesAsString());

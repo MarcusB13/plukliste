@@ -129,6 +129,10 @@ public class BuisnessLayer
     private string _importPath;
 
     public List<string> files = new List<string>();
+    public int fileCount
+    {
+        get { return files.Count; }
+    }
     public PluklistFile? currentFile { get; private set; }
     public int currentIndex = 0;
 
