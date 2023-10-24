@@ -1,42 +1,70 @@
 ﻿//Eksempel på funktionel kodning hvor der kun bliver brugt et model lag
+using CsvHelper;
+using CsvHelper.Configuration;
+using Microsoft.VisualBasic.FileIO;
+using System;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
+using System.Data;
+using Dapper;
+
 namespace Plukliste;
 
 class PluklisteProgram {
     private static ConsoleColor standardColor = ConsoleColor.White;
-    private static int index = -1;
-    private static List<PluklistFile> files = new List<PluklistFile>();
-    private static PluklistFile? currentFile;
     private static char readKey = ' ';
+
+    private static BuisnessLayer buisnessLayer = new BuisnessLayer("export", "import");
+    private static string ConnString = "Data Source=10.130.54.66;Database=Pluklist;User ID=pluklist;Password=1234; TrustServerCertificate=True;";
 
     static void Main()
     {
-        //Arrange
-        Directory.CreateDirectory("import");
+        using (var conn = new SqlConnection(ConnString))
+        {
+            conn.Open();
+            List<Pluklist> result = conn.Query<Pluklist>("SELECT * FROM pluklist").ToList();
+
+            result.ForEach(pluklist =>
+            {
+                Console.WriteLine(pluklist.Name);
+            });
+        }
+
+
+            //Arrange
+            Directory.CreateDirectory("import");
+        Directory.CreateDirectory("print");
         if (!DirectoryExists("export"))
         {
             Console.WriteLine("Directory \"export\" not found");
-            Console.ReadLine();
             return;
         }
 
-        GetFiles();
+        if (!DirectoryExists("templates"))
+        {
+            Console.WriteLine("Directory \"templates\" not found");
+            return;
+        }
 
         //ACT
+        buisnessLayer.reloadFiles();
         while (readKey != 'Q')
         {
-            if (files.Count == 0)
+            if (!buisnessLayer.doesFilesExist())
             {
                 Console.WriteLine("No files found.");
             }
             else
             {
-                if (index == -1) index = 0;
-                currentFile = files[index];
-                foreach (string line in currentFile.DataList)
-                {
-                    // Loop through each line of data in the file. And write it to the console
-                    Console.WriteLine(line);
-                }
+                buisnessLayer.getCurrentPlukListFile();
+
+                Console.WriteLine(buisnessLayer.currentFile.pluklist.getNameAsString());
+                Console.WriteLine(buisnessLayer.currentFile.pluklist.getForsendelse());
+                Console.WriteLine(buisnessLayer.currentFile.pluklist.getLinesAsString());
+                
             }
 
             // Print options
@@ -73,18 +101,19 @@ class PluklisteProgram {
     {
         Console.WriteLine("\n\nOptions:");
         ConsoleWriteStringInColor("Quit");
-        if (index >= 0)
+        if (buisnessLayer.currentIndex >= 0)
         {
             ConsoleWriteStringInColor("Afslut plukseddel");
         }
-        if (index > 0)
+        if (buisnessLayer.currentIndex > 0)
         {
             ConsoleWriteStringInColor("Forrige plukseddel");
         }
-        if (index < files.Count - 1)
+        if (buisnessLayer.currentIndex < buisnessLayer.files.Count - 1)
         {
             ConsoleWriteStringInColor("Næste plukseddel");
         }
+        ConsoleWriteStringInColor("Template pluksedel");
         ConsoleWriteStringInColor("Genindlæs pluksedler");
     }
 
@@ -100,64 +129,30 @@ class PluklisteProgram {
         switch (readKey)
         {
             case 'G':
-                GetFiles();
-                index = -1;
+                buisnessLayer.reloadFiles();
 
                 ConsoleWriteStringInColor("Pluklister genindlæst", ConsoleColor.Red);
                 Console.WriteLine(); // New Line
                 break;
             case 'F':
-                if (currentFile.HasPrevious()) index--;
+                buisnessLayer.previous();
                 break;
             case 'N':
-                if (currentFile.HasNext()) index++;
+                buisnessLayer.next();
                 break;
             case 'A':
                 //Move files to import directory
-                var filewithoutPath = files[index].FileName;
-                File.Move(files[index].FilePath, string.Format(@"import\\{0}", filewithoutPath));
+                string moveCurrentFileToImport = buisnessLayer.moveCurrentFileToImport();
 
-                ConsoleWriteStringInColor($"Plukseddel {files[index]} afsluttet.", ConsoleColor.Red);
+                ConsoleWriteStringInColor($"Plukseddel {moveCurrentFileToImport} afsluttet.", ConsoleColor.Red);
                 Console.WriteLine(); // New Line
-
-                files.Remove(files[index]);
-                if (index == files.Count) index--;
                 break;
+            case 'T':
+                string fileToCreate = buisnessLayer.currentFileToHtml();
+
+                Console.WriteLine("Added the template for {0} at print/{0}.html", fileToCreate);
+                break;
+
         }
-    }
-
-    static void GetFiles()
-    {
-        List<string> fileNames = Directory.EnumerateFiles("export").ToList();
-        int fileNamesCount = fileNames.Count();
-        fileNames.ForEach(fileName =>
-        {
-            PluklistFile pluklistFile = new PluklistFile
-            {
-                DataList = new List<string>(),
-                FileName = fileName.Substring(fileName.LastIndexOf('/')),
-                FileIndex = fileNames.IndexOf(fileName),
-                NumberOfFiles = fileNamesCount,
-                FilePath = fileName
-            };
-
-            using (FileStream file = File.OpenRead(fileName))
-            {
-                System.Xml.Serialization.XmlSerializer xmlSerializer =
-                        new System.Xml.Serialization.XmlSerializer(typeof(Pluklist));
-                var plukliste = (Pluklist?)xmlSerializer.Deserialize(file);
-
-                pluklistFile.DataList.Add(String.Format("\n{0, -13}{1}", "Name:", pluklistFile.FileName));
-                pluklistFile.DataList.Add(String.Format("{0, -13}{1}", "Forsendelse:", plukliste.Forsendelse));
-                pluklistFile.DataList.Add(String.Format("\n{0,-7}{1,-9}{2,-20}{3}", "Antal", "Type", "Produktnr.", "Navn"));
-
-                foreach (var item in plukliste.Lines)
-                {
-                    pluklistFile.DataList.Add(String.Format("{0,-7}{1,-9}{2,-20}{3}", item.Amount, item.Type, item.ProductID, item.Title));
-                }
-            }
-
-            files.Add(pluklistFile);
-        });
     }
 }
